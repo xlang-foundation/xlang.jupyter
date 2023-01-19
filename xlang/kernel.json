@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "C:\\Dev\\X\\out\\build\\x64-Debug\\xlang",
+    "-event_loop",
+    "-dbg",
+    "-enable_python",
+    "xlang_kernel.x",
+    "-f",
+    "{connection_file}"
+  ],
+    "display_name": "xlang",
+    "name": "xlang",
+    "language": "python"
+}
