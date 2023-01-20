@@ -1,97 +1,44 @@
-import sys
-print("Argument List:", str(sys.argv)) 
 from ipykernel.kernelbase import Kernel
-import numpy as np
-import matplotlib.pyplot as plt
-from io import BytesIO
-import urllib, base64
 
 g_cb_from_xlang = None
 
-def _to_png(fig):
-    """Return a base64-encoded PNG from a
-    matplotlib figure."""
-    imgdata = BytesIO()
-    fig.savefig(imgdata, format='png')
-    imgdata.seek(0)
-    return urllib.parse.quote(
-        base64.b64encode(imgdata.getvalue()))
+class KernelObj:
+    _kernel = None
+    def __init__(self,k):
+        self._kernel = k 
+    def send_stdout(self,outputInfo):
+        stream_content = {'name': 'stdout', 'text': outputInfo}
+        self._kernel.send_response(
+            self._kernel.iopub_socket,
+            'stream',stream_content)
+    def send_response(self,msg_type,content):
+        self._kernel.send_response(
+        self._kernel.iopub_socket,
+            msg_type,content)
 
-_numpy_namespace = {n: getattr(np, n)
-                    for n in dir(np)}
-def _parse_function(code):
-    """Return a NumPy function from a
-    string 'y=f(x)'."""
-    return lambda x: eval(code.split('=')[1].strip(),
-                          _numpy_namespace, {'x': x})
-
-class PlotKernel(Kernel):
-    implementation = 'Plot'
-    implementation_version = '1.0'
+class Xlang_Kernel(Kernel):
+    implementation = 'xlang'
+    implementation_version = '0.1'
     language = 'python'  # will be used for
                          # syntax highlighting
-    language_version = '3.6'
-    language_info = {'name': 'plotter',
+    language_version = '1.0'
+    language_info = {'name': 'xlang',
                      'mimetype': 'text/plain',
-                     'extension': '.py'}
-    banner = "Simple plotting"
+                     'extension': '.x'}
+    banner = "xlang interactive"
+    kernelObj = None
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.kernelObj = KernelObj(self)
     def do_execute(self, code, silent,
                     store_history=True,
                     user_expressions=None,
                     allow_stdin=False):
-            g_cb_from_xlang(code,silent,store_history,user_expressions,allow_stdin)
-            # We create the plot with matplotlib.
-            fig, ax = plt.subplots(1, 1, figsize=(6,4),
-                                dpi=100)
-            x = np.linspace(-5., 5., 200)
-            functions = code.split('\n')
-            for fun in functions:
-                f = _parse_function(fun)
-                y = f(x)
-                ax.plot(x, y)
-            ax.set_xlim(-5, 5)
-
-            # We create a PNG out of this plot.
-            png = _to_png(fig)
-
-            if not silent:
-                # We send the standard output to the
-                # client.
-                self.send_response(
-                    self.iopub_socket,
-                    'stream', {
-                        'name': 'stdout',
-                        'data': ('Plotting {n} '
-                                'function(s)'). \
-                                format(n=len(functions))})
-
-                # We prepare the response with our rich
-                # data (the plot).
-                content = {
-                    'source': 'kernel',
-
-                    # This dictionary may contain
-                    # different MIME representations of
-                    # the output.
-                    'data': {
-                        'image/png': png
-                    },
-
-                    # We can specify the image size
-                    # in the metadata field.
-                    'metadata' : {
-                        'image/png' : {
-                            'width': 600,
-                            'height': 400
-                        }
-                        }
-                }
-
-                # We send the display_data message with
-                # the contents.
-                self.send_response(self.iopub_socket,
-                    'display_data', content)
-
+            g_cb_from_xlang(self.kernelObj,
+                            code,silent,
+                            store_history,
+                            user_expressions,
+                            allow_stdin)
             # We return the exection results.
             return {'status': 'ok',
                     'execution_count':
@@ -105,4 +52,4 @@ def Run(cb_in_xlang):
     g_cb_from_xlang = cb_in_xlang
     from ipykernel.kernelapp import IPKernelApp
     IPKernelApp.launch_instance(
-        kernel_class=PlotKernel)
+        kernel_class=Xlang_Kernel)
